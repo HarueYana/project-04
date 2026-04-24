@@ -1,0 +1,75 @@
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  background-color: #222;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: sans-serif;
+}
+
+#app-frame {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  background-color: #f0f0f0;
+  border-radius: 40px;
+  overflow: hidden;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+}
+
+#ui-layer {
+  position: absolute;
+  top: 40px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 10;
+}
+
+.input-area {
+  display: flex;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px;
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  width: 85%;
+}
+
+.mode-area {
+  display: flex;
+  justify-content: flex-end;
+  width: 85%;
+}
+
+input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+}
+
+button {
+  padding: 10px 15px;
+  background-color: #333;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#modeBtn {
+  background-color: rgba(255,255,255,0.85);
+  color: #333;
+  border: 1px solid #ccc;
+  padding: 7px 14px;
+  font-size: 12px;
+}
