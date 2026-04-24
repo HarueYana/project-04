@@ -90,7 +90,10 @@ function draw() {
     // 削除フェードアウト中
     if (item.removing) {
       item.opacity -= 18;
-      Matter.Body.setVelocity(b, { x: item.removeDir * 22, y: vel.y - 1 });
+      // 物理エンジンから切り離して水平に移動
+      Matter.Body.setPosition(b, { x: pos.x + item.removeDir * 28, y: item.removeStartY });
+      Matter.Body.setVelocity(b, { x: 0, y: 0 });
+      Matter.Body.setAngle(b, 0); // 傾きをゼロに固定
       if (item.opacity <= 0) {
         Matter.World.remove(world, b);
         boxes.splice(i, 1);
@@ -107,14 +110,18 @@ function draw() {
     if (!isGrabbed) {
       if (SWIPE_MODE === 'tinder') {
         if (abs(vel.x) > DISMISS_VELOCITY) {
-          item.removing  = true;
-          item.removeDir = vel.x > 0 ? 1 : -1;
+          item.removing     = true;
+          item.removeDir    = vel.x > 0 ? 1 : -1;
+          item.removeStartY = pos.y;
+          Matter.Body.setAngle(b, 0);
           continue;
         }
       } else {
         if (abs(offsetX) > DISMISS_DISTANCE) {
-          item.removing  = true;
-          item.removeDir = offsetX > 0 ? 1 : -1;
+          item.removing     = true;
+          item.removeDir    = offsetX > 0 ? 1 : -1;
+          item.removeStartY = pos.y;
+          Matter.Body.setAngle(b, 0);
           continue;
         }
       }
@@ -138,8 +145,8 @@ function drawBlock(item) {
   let offsetX = pos.x - width / 2;
   let [r, g, bv] = PRIORITY_COLORS[item.priority];
 
-  // 傾き
-  let tilt = map(offsetX, -200, 200, -0.15, 0.15);
+  // 傾き（削除中は水平を保つ）
+  let tilt = item.removing ? 0 : map(offsetX, -200, 200, -0.15, 0.15);
 
   // iOSモード削除ヒント
   let dismissProgress = 0;
