@@ -86,7 +86,7 @@ function mouseDragged() {
   }
 
   if (dragDirection === 'vertical') {
-    scrollOffset += (pmouseY - mouseY);
+    scrollOffset -= (pmouseY - mouseY);
   }
 }
 
@@ -265,6 +265,6 @@ function draw() {
 }
 
 function mouseWheel(event) {
-  scrollOffset += event.delta;
+  scrollOffset -= event.delta;
   return false;
 }
