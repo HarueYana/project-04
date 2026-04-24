@@ -11,6 +11,8 @@ let touchStartY = 0;
 let touchStartTime = 0;
 let touchedBox = null;
 let dragDirection = null; // 'horizontal' | 'vertical' | null
+let longPressTimer = null;
+const LONG_PRESS_MS = 500;
 
 function setup() {
   const cardFrame = document.getElementById('card-frame');
@@ -73,6 +75,17 @@ function mousePressed() {
       break;
     }
   }
+
+  // 長押しタイマー開始
+  if (touchedBox !== null) {
+    longPressTimer = setTimeout(() => {
+      if (dragDirection === null && touchedBox !== null) {
+        // マークをトグル
+        touchedBox.marked = !touchedBox.marked;
+        touchedBox = null; // 長押し後はフリック無効
+      }
+    }, LONG_PRESS_MS);
+  }
 }
 
 // ドラッグ中：方向確定後にスクロールのみ処理
@@ -81,6 +94,8 @@ function mouseDragged() {
   let dy = mouseY - touchStartY;
 
   if (dragDirection === null && (abs(dx) > 8 || abs(dy) > 8)) {
+    // 動いたら長押しキャンセル
+    if (longPressTimer !== null) { clearTimeout(longPressTimer); longPressTimer = null; }
     dragDirection = abs(dy) > abs(dx) ? 'vertical' : 'horizontal';
     if (dragDirection === 'vertical') touchedBox = null;
   }
@@ -92,6 +107,7 @@ function mouseDragged() {
 
 // タッチ終了：フリック判定
 function mouseReleased() {
+  if (longPressTimer !== null) { clearTimeout(longPressTimer); longPressTimer = null; }
   if (dragDirection === 'vertical' || touchedBox === null) {
     dragDirection = null;
     touchedBox = null;
@@ -253,11 +269,30 @@ function draw() {
 
     push();
     translate(b.position.x, b.position.y);
+
+    // マーク済みは枠線を追加
+    if (b.marked) {
+      stroke(255, 220, 0);
+      strokeWeight(3);
+    } else {
+      noStroke();
+    }
     rect(0, 0, width - 26, b.boxHeight, 12);
+    noStroke();
+
+    // テキスト
     fill(255, 255, 255, b.boxColor[3]);
     textAlign(LEFT, CENTER);
     textSize(15);
     text(b.taskLabel, -(width / 2 - 26), 0);
+
+    // マーク済みは★を表示
+    if (b.marked) {
+      textAlign(RIGHT, CENTER);
+      textSize(18);
+      fill(255, 220, 0, b.boxColor[3]);
+      text('★', (width / 2 - 36), 0);
+    }
     pop();
   }
 
