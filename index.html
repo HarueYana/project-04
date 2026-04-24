@@ -10,15 +10,62 @@
 </head>
 <body>
   <div id="app-frame">
-    <div id="ui-layer">
-      <div class="input-area">
-        <input type="text" id="taskInput" placeholder="新しいタスクを積む...">
-        <button id="addBtn">追加</button>
-      </div>
-      <div class="mode-area">
-        <button id="modeBtn">🃏 Tinder式</button>
+
+    <!-- ヘッダー -->
+    <div id="header">
+      <span id="greeting">こんにちは、Masa!!</span>
+      <button id="settingsBtn">⚙️</button>
+    </div>
+
+    <!-- タブ -->
+    <div id="tab-area">
+      <button class="tab-btn active" data-filter="all">All</button>
+      <button class="tab-btn" data-filter="today">今日中</button>
+      <button class="tab-btn" data-filter="week">一週間</button>
+      <button class="tab-btn" data-filter="someday">いつか</button>
+    </div>
+
+    <!-- カードエリア（p5キャンバスの親） -->
+    <div id="card-frame">
+      <!-- p5キャンバスはここに挿入される -->
+    </div>
+
+    <!-- ＋ボタン -->
+    <button id="openModalBtn" class="fab">+</button>
+    <!-- ↓ボタン -->
+    <button id="scrollToBottomBtn" class="fab scroll-fab hidden">↓</button>
+
+    <!-- モーダル -->
+    <div id="taskModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>タスクの準備</h3>
+        <div class="input-group">
+          <label>タスク名</label>
+          <input type="text" id="taskInput" placeholder="タスク名を入力...">
+        </div>
+        <div class="input-group">
+          <label>重さ</label>
+          <div class="button-group" id="weightGroup">
+            <button class="select-btn" data-value="small">小</button>
+            <button class="select-btn active" data-value="medium">中</button>
+            <button class="select-btn" data-value="large">大</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>期限</label>
+          <div class="button-group" id="originGroup">
+            <button class="select-btn active" data-value="today">今日中</button>
+            <button class="select-btn" data-value="week">一週間</button>
+            <button class="select-btn" data-value="someday">いつか</button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="cancelBtn" class="btn-cancel">やめる</button>
+          <button id="addBtn" class="btn-submit">積む！</button>
+        </div>
       </div>
     </div>
+
   </div>
   <script src="script.js"></script>
 </body>
