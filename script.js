@@ -11,8 +11,6 @@ let touchStartY = 0;
 let touchStartTime = 0;
 let touchedBox = null;
 let dragDirection = null; // 'horizontal' | 'vertical' | null
-const TAP_MAX_DIST = 10; // この距離以内で離したらタップ
-const TAP_MAX_MS = 300;  // この時間以内で離したらタップ
 
 function setup() {
   const cardFrame = document.getElementById('card-frame');
@@ -92,7 +90,7 @@ function mouseDragged() {
   }
 }
 
-// タッチ終了：タップ判定 or フリック判定
+// タッチ終了：フリック判定
 function mouseReleased() {
   if (dragDirection === 'vertical' || touchedBox === null) {
     dragDirection = null;
@@ -102,21 +100,32 @@ function mouseReleased() {
 
   let dx = mouseX - touchStartX;
   let dy = mouseY - touchStartY;
-  let dist = sqrt(dx * dx + dy * dy);
-  let dt = millis() - touchStartTime;
+  let totalDist = sqrt(dx * dx + dy * dy);
 
-  if (dist < TAP_MAX_DIST && dt < TAP_MAX_MS) {
-    // タップ：マークをトグル
-    touchedBox.marked = !touchedBox.marked;
-  } else {
-    // フリック判定
-    let vx = dx / dt;
-    const FLICK_THRESHOLD = 0.5;
-    if (abs(vx) > FLICK_THRESHOLD && abs(dx) > abs(dy) * 1.5) {
-      let dir = vx > 0 ? 1 : -1;
-      let speed = constrain(abs(vx) * 25, 15, 40);
-      Matter.Body.setVelocity(touchedBox, { x: dir * speed, y: -2 });
+  // ほぼ動いていない（タップ）場合はマークアイコンのタップを判定
+  if (totalDist < 8) {
+    let physY = touchStartY - scrollOffset;
+    let b = touchedBox;
+    // マークアイコンの位置：カード左端から約20px、縦中央
+    let iconX = b.position.x - (width / 2 - 13) + 20;
+    let iconY = b.position.y;
+    let iconR = 18; // タップ判定半径
+    if (dist(touchStartX, physY, iconX, iconY) < iconR) {
+      b.marked = !b.marked;
+      dragDirection = null;
+      touchedBox = null;
+      return;
     }
+  }
+
+  let dt = millis() - touchStartTime;
+  let vx = dx / dt;
+
+  const FLICK_THRESHOLD = 0.5;
+  if (abs(vx) > FLICK_THRESHOLD && abs(dx) > abs(dy) * 1.5) {
+    let dir = vx > 0 ? 1 : -1;
+    let speed = constrain(abs(vx) * 25, 15, 40);
+    Matter.Body.setVelocity(touchedBox, { x: dir * speed, y: -2 });
   }
 
   dragDirection = null;
@@ -196,6 +205,7 @@ function addNewTask() {
   b.boxColor = [baseColor[0], baseColor[1], baseColor[2], alpha];
   b.originVal = originVal;
   b.isHidden = false;
+  b.marked = false; // マーク状態
 
   if (currentFilter !== 'all' && originVal !== currentFilter) {
     b.isHidden = true;
@@ -257,28 +267,51 @@ function draw() {
     }
 
     fill(b.boxColor[0], b.boxColor[1], b.boxColor[2], b.boxColor[3]);
-    if (b.marked) {
-      stroke(255, 220, 0);
-      strokeWeight(3);
-    } else {
-      noStroke();
-    }
+    noStroke();
     rectMode(CENTER);
 
     push();
     translate(b.position.x, b.position.y);
     rect(0, 0, width - 26, b.boxHeight, 12);
-    noStroke();
+
+    // マークアイコン（!）：カード左端に配置
+    let iconX = -(width / 2 - 13) + 20;
+    let iconY = 0;
+    let iconR = 12;
+    if (b.marked) {
+      // 塗りつぶし
+      fill(255, 255, 255, b.boxColor[3]);
+      noStroke();
+      ellipse(iconX, iconY, iconR * 2, iconR * 2);
+      // ! テキスト（塗り時は色付き）
+      fill(b.boxColor[0], b.boxColor[1], b.boxColor[2], b.boxColor[3]);
+      textAlign(CENTER, CENTER);
+      textSize(13);
+      textStyle(BOLD);
+      text('!', iconX, iconY);
+      textStyle(NORMAL);
+    } else {
+      // 枠線のみ
+      noFill();
+      stroke(255, 255, 255, b.boxColor[3]);
+      strokeWeight(2);
+      ellipse(iconX, iconY, iconR * 2, iconR * 2);
+      // ! テキスト（枠線時は白）
+      fill(255, 255, 255, b.boxColor[3]);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      textSize(13);
+      textStyle(BOLD);
+      text('!', iconX, iconY);
+      textStyle(NORMAL);
+    }
+
+    // タスク名（アイコン分だけ右にずらす）
     fill(255, 255, 255, b.boxColor[3]);
+    noStroke();
     textAlign(LEFT, CENTER);
     textSize(15);
-    text(b.taskLabel, -(width / 2 - 26), 0);
-    if (b.marked) {
-      textAlign(RIGHT, CENTER);
-      textSize(18);
-      fill(255, 220, 0, b.boxColor[3]);
-      text('★', (width / 2 - 36), 0);
-    }
+    text(b.taskLabel, -(width / 2 - 26) + 44, 0);
     pop();
   }
 
