@@ -4,7 +4,11 @@ let boxes = [];
 let ground;
 let mConstraint;
 let currentFilter = 'all';
-let scrollOffset = 0; // 新規追加：スクロール量（カメラをどれくらい上にずらすか）
+let scrollOffset = 0;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragDirection = null; // 'horizontal' | 'vertical' | null
+let isScrolling = false;
 
 function setup() {
   // card-frameのサイズに合わせてキャンバスを作成（390-24px両側, 844-148-12px）
@@ -235,9 +239,38 @@ function mouseWheel(event) {
   return false; // ブラウザ自体のスクロールを防ぐ
 }
 
+function mousePressed() {
+  dragStartX = mouseX;
+  dragStartY = mouseY;
+  dragDirection = null;
+  isScrolling = false;
+}
+
 function mouseDragged() {
-  // 物理ブロックを掴んでいない時だけ、背景をスワイプ（ドラッグ）してスクロール可能にする
-  if (!mConstraint.body) {
+  let dx = mouseX - dragStartX;
+  let dy = mouseY - dragStartY;
+
+  // ドラッグ方向をまだ決めていない場合、一定距離動いたら確定する
+  if (dragDirection === null && (abs(dx) > 8 || abs(dy) > 8)) {
+    if (abs(dy) > abs(dx)) {
+      dragDirection = 'vertical';
+      isScrolling = true;
+      // 縦スクロールと判定したらMatter.jsの掴みを解除
+      Matter.MouseConstraint.clearBodyAtPoint(mConstraint, { x: mouseX, y: mouseY - scrollOffset });
+      mConstraint.body = null;
+    } else {
+      dragDirection = 'horizontal';
+      isScrolling = false;
+    }
+  }
+
+  // 縦方向と確定済みの場合のみスクロール
+  if (isScrolling) {
     scrollOffset += (pmouseY - mouseY);
   }
+}
+
+function mouseReleased() {
+  dragDirection = null;
+  isScrolling = false;
 }
