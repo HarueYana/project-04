@@ -14,6 +14,11 @@ let dragDirection = null;
 
 const CARD_GAP = 8;
 
+// エフェクト管理
+let particles = [];  // 土煙パーティクル
+let shakeAmount = 0; // 画面振動量
+let shakeDecay = 0.85; // 振動の減衰率
+
 function setup() {
   const cardFrame = document.getElementById('card-frame');
   const cw = cardFrame.clientWidth;
@@ -227,6 +232,11 @@ function mouseReleased() {
     b.removeX = b.landed ? b.fixedX : b.body.position.x;
     b.removeY = b.landed ? b.fixedY : b.body.position.y;
     b.removeOpacity = 255;
+
+    // 重さに応じたエフェクト強度
+    let intensity = b.boxHeight <= 50 ? 1 : (b.boxHeight >= 160 ? 3 : 2);
+    triggerEffect(b.removeX, b.removeY, intensity, b.boxColor);
+
     Matter.World.remove(world, b.body);
     setTimeout(() => {
       boxes = boxes.filter(box => box !== b);
@@ -236,6 +246,37 @@ function mouseReleased() {
 
   dragDirection = null;
   touchedBox = null;
+}
+
+// エフェクトのトリガー
+function triggerEffect(x, y, intensity, col) {
+  // 画面振動
+  shakeAmount = intensity * 4;
+
+  // バイブレーション（対応端末のみ）
+  if (navigator.vibrate) {
+    if (intensity === 1) {
+      navigator.vibrate(30);
+    } else if (intensity === 2) {
+      navigator.vibrate(60);
+    } else {
+      navigator.vibrate([80, 30, 80]);
+    }
+  }
+
+  // 土煙パーティクル生成
+  let count = intensity * 8;
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: x + random(-20, 20),
+      y: y + random(-10, 10),
+      vx: random(-2, 2) * intensity,
+      vy: random(-3, -1) * intensity,
+      size: random(6, 14) * intensity,
+      opacity: 180,
+      col: col,
+    });
+  }
 }
 
 function draw() {
@@ -271,8 +312,13 @@ function draw() {
   const scrollBtn = document.getElementById('scrollToBottomBtn');
   scrollBtn.classList.toggle('hidden', scrollOffset <= 50);
 
+  // 振動処理
+  shakeAmount *= shakeDecay;
+  let sx = shakeAmount > 0.5 ? random(-shakeAmount, shakeAmount) : 0;
+  let sy = shakeAmount > 0.5 ? random(-shakeAmount, shakeAmount) : 0;
+
   push();
-  translate(0, scrollOffset);
+  translate(sx, scrollOffset + sy);
 
   boxes.filter(b => b.removing).forEach(b => {
     b.removeX += b.removeDir * 30;
@@ -286,6 +332,24 @@ function draw() {
     let by = b.landed ? b.fixedY : b.body.position.y;
     drawCard(b, bx, by, 255);
   });
+
+  // パーティクル描画・更新
+  noStroke();
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15; // 重力
+    p.opacity -= 8;
+    p.size *= 0.95;
+    if (p.opacity <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    // カードの色を薄くしたもので土煙を表現
+    fill(p.col[0], p.col[1], p.col[2], p.opacity * 0.5);
+    ellipse(p.x, p.y, p.size);
+  }
 
   pop();
 }
