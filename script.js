@@ -254,13 +254,13 @@ function triggerEffect(x, y, intensity, col) {
   shakeAmount = intensity * 4;
 
   // バイブレーション（対応端末のみ）
-  if (navigator.vibrate) {
+  if ('vibrate' in navigator) {
     if (intensity === 1) {
-      navigator.vibrate(30);
+      navigator.vibrate(20);          // 小：短く軽く
     } else if (intensity === 2) {
-      navigator.vibrate(60);
+      navigator.vibrate(50);          // 中：はっきり1回
     } else {
-      navigator.vibrate([80, 30, 80]);
+      navigator.vibrate([80, 30, 80]); // 大：ドンッ・ドンッ
     }
   }
 
