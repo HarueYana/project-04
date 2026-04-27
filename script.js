@@ -5,7 +5,6 @@ let ground;
 let currentFilter = 'all';
 let scrollOffset = 0;
 
-// タッチ・フリック管理
 let touchStartX = 0;
 let touchStartY = 0;
 let touchStartTime = 0;
@@ -14,10 +13,52 @@ let dragDirection = null;
 
 const CARD_GAP = 8;
 
-// エフェクト管理
-let particles = [];  // 土煙パーティクル
-let shakeAmount = 0; // 画面振動量
-let shakeDecay = 0.85; // 振動の減衰率
+let particles = [];
+let shakeAmount = 0;
+let shakeDecay = 0.85;
+
+// localStorage保存
+function saveTasks() {
+  const data = boxes.map(b => ({
+    taskLabel: b.taskLabel,
+    boxHeight: b.boxHeight,
+    boxColor: b.boxColor,
+    originVal: b.originVal,
+    marked: b.marked,
+    weightVal: b.weightVal,
+  }));
+  localStorage.setItem('daruma_tasks', JSON.stringify(data));
+}
+
+// localStorage読み込み
+function loadTasks() {
+  const raw = localStorage.getItem('daruma_tasks');
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    data.forEach((d, i) => {
+      let spawnY = -80 - (i * 130);
+      let body = Matter.Bodies.rectangle(width / 2, spawnY, width - 26, d.boxHeight, {
+        restitution: 0.05, friction: 0, frictionStatic: 0, frictionAir: 0.02, inertia: Infinity
+      });
+      Matter.World.add(world, body);
+      boxes.push({
+        body,
+        taskLabel: d.taskLabel,
+        boxHeight: d.boxHeight,
+        boxColor: d.boxColor,
+        originVal: d.originVal,
+        marked: d.marked || false,
+        weightVal: d.weightVal || 'medium',
+        landed: false,
+        removing: false,
+        removeDir: 0, removeX: 0, removeY: 0, removeOpacity: 255,
+      });
+    });
+  } catch(e) {
+    console.warn('loadTasks failed:', e);
+  }
+}
 
 function setup() {
   const cardFrame = document.getElementById('card-frame');
@@ -43,29 +84,27 @@ function setup() {
     });
   });
 
-  const openModalBtn = document.getElementById('openModalBtn');
-  const cancelBtn = document.getElementById('cancelBtn');
-  const addBtn = document.getElementById('addBtn');
-  const modal = document.getElementById('taskModal');
-  const taskInput = document.getElementById('taskInput');
-  const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
-
-  openModalBtn.addEventListener('click', () => modal.classList.remove('hidden'));
-  cancelBtn.addEventListener('click', () => { modal.classList.add('hidden'); taskInput.value = ''; });
-  addBtn.addEventListener('click', addNewTask);
-  scrollToBottomBtn.addEventListener('click', () => { scrollOffset = 0; });
+  document.getElementById('openModalBtn').addEventListener('click', () =>
+    document.getElementById('taskModal').classList.remove('hidden'));
+  document.getElementById('cancelBtn').addEventListener('click', () => {
+    document.getElementById('taskModal').classList.add('hidden');
+    document.getElementById('taskInput').value = '';
+  });
+  document.getElementById('addBtn').addEventListener('click', addNewTask);
+  document.getElementById('scrollToBottomBtn').addEventListener('click', () => { scrollOffset = 0; });
 
   setupSelectionLogic('weightGroup');
   setupSelectionLogic('originGroup');
+
+  loadTasks();
 }
 
 function getVisibleBoxes() {
   return boxes.filter(b => currentFilter === 'all' || b.originVal === currentFilter);
 }
 
-// 修正①：物理的な地面の高さ（height - 10）に合わせ、古いものから順に下から積む
 function getTargetY(index, visibleBoxes) {
-  let y = height - 10; 
+  let y = height - 10;
   for (let i = 0; i < index; i++) {
     y -= visibleBoxes[i].boxHeight + CARD_GAP;
   }
@@ -73,16 +112,24 @@ function getTargetY(index, visibleBoxes) {
   return y;
 }
 
-// 修正②：フィルター切り替え時、新しいものほど高い上空から落として空中衝突を防ぐ
 function updateFilter() {
-  let visible = getVisibleBoxes();
+  // 全タスクをいったん物理世界から削除
+  boxes.forEach(b => {
+    if (!b.removing) {
+      try { Matter.World.remove(world, b.body); } catch(e) {}
+    }
+  });
+
+  // 表示対象のタスクだけ物理世界に追加して落とす
+  let visible = getVisibleBoxes().filter(b => !b.removing);
   visible.forEach((b, i) => {
     b.landed = false;
-    b.body.isStatic = false;
-    Matter.Body.setStatic(b.body, false);
     Matter.Body.setPosition(b.body, { x: width / 2, y: -80 - (i * 130) });
     Matter.Body.setVelocity(b.body, { x: 0, y: 0 });
+    Matter.Body.setStatic(b.body, false);
+    Matter.World.add(world, b.body);
   });
+
   scrollOffset = 0;
 }
 
@@ -112,17 +159,11 @@ function addNewTask() {
   const palette = [[57, 133, 247], [60, 160, 60], [137, 106, 230], [222, 27, 90]];
   let baseColor = random(palette);
 
-  // 修正③：連打した時に空中で重なって爆発しないよう、出現位置を少しずつずらす
   let spawnY = -80 - (boxes.length * 30);
 
   let body = Matter.Bodies.rectangle(width / 2, spawnY, width - 26, boxHeight, {
-    restitution: 0.05,
-    friction: 0,
-    frictionStatic: 0,
-    frictionAir: 0.02,
-    inertia: Infinity
+    restitution: 0.05, friction: 0, frictionStatic: 0, frictionAir: 0.02, inertia: Infinity
   });
-  Matter.World.add(world, body);
 
   let box = {
     body,
@@ -130,30 +171,40 @@ function addNewTask() {
     boxHeight,
     boxColor: baseColor,
     originVal,
+    weightVal,
     marked: false,
     landed: false,
     removing: false,
-    removeDir: 0,
-    removeX: 0,
-    removeOpacity: 255,
+    removeDir: 0, removeX: 0, removeY: 0, removeOpacity: 255,
   };
 
   boxes.push(box);
 
-  if (currentFilter !== 'all' && originVal !== currentFilter) {
-    Matter.World.remove(world, body);
+  // 現在のフィルターに表示されるタスクのみ物理世界に追加
+  if (currentFilter === 'all' || originVal === currentFilter) {
+    Matter.World.add(world, body);
   }
 
+  saveTasks();
   taskInput.value = '';
   document.getElementById('taskModal').classList.add('hidden');
 }
 
 function reshuffleVisible() {
+  // 全タスクを物理世界から削除してから再配置
+  boxes.forEach(b => {
+    if (!b.removing) {
+      try { Matter.World.remove(world, b.body); } catch(e) {}
+    }
+  });
+
   let visible = getVisibleBoxes().filter(b => !b.removing);
-  visible.forEach((b) => {
+  visible.forEach((b, i) => {
     b.landed = false;
-    Matter.Body.setStatic(b.body, false);
+    Matter.Body.setPosition(b.body, { x: width / 2, y: -80 - (i * 60) });
     Matter.Body.setVelocity(b.body, { x: 0, y: 0 });
+    Matter.Body.setStatic(b.body, false);
+    Matter.World.add(world, b.body);
   });
 }
 
@@ -215,6 +266,7 @@ function mouseReleased() {
     let iconY = by;
     if (dist(touchStartX, physY, iconX, iconY) < 18) {
       b.marked = !b.marked;
+      saveTasks();
       dragDirection = null;
       touchedBox = null;
       return;
@@ -233,14 +285,15 @@ function mouseReleased() {
     b.removeY = b.landed ? b.fixedY : b.body.position.y;
     b.removeOpacity = 255;
 
-    // 重さに応じたエフェクト強度
     let intensity = b.boxHeight <= 50 ? 1 : (b.boxHeight >= 160 ? 3 : 2);
     triggerEffect(b.removeX, b.removeY, intensity, b.boxColor);
 
-    Matter.World.remove(world, b.body);
+    try { Matter.World.remove(world, b.body); } catch(e) {}
+
     setTimeout(() => {
       boxes = boxes.filter(box => box !== b);
       reshuffleVisible();
+      saveTasks();
     }, 300);
   }
 
@@ -248,23 +301,15 @@ function mouseReleased() {
   touchedBox = null;
 }
 
-// エフェクトのトリガー
 function triggerEffect(x, y, intensity, col) {
-  // 画面振動
   shakeAmount = intensity * 4;
 
-  // バイブレーション（対応端末のみ）
   if ('vibrate' in navigator) {
-    if (intensity === 1) {
-      navigator.vibrate(20);          // 小：短く軽く
-    } else if (intensity === 2) {
-      navigator.vibrate(50);          // 中：はっきり1回
-    } else {
-      navigator.vibrate([80, 30, 80]); // 大：ドンッ・ドンッ
-    }
+    if (intensity === 1) navigator.vibrate(20);
+    else if (intensity === 2) navigator.vibrate(50);
+    else navigator.vibrate([80, 30, 80]);
   }
 
-  // 土煙パーティクル生成
   let count = intensity * 8;
   for (let i = 0; i < count; i++) {
     particles.push({
@@ -285,14 +330,10 @@ function draw() {
 
   let visible = getVisibleBoxes();
 
-  // 修正④：着地判定に余裕をもたせる
   visible.forEach((b, i) => {
     if (b.removing || b.landed) return;
     let targetY = getTargetY(i, visible);
-    let currentY = b.body.position.y;
-
-    // 目標座標の「5px手前」まで来たら、強制的に着地させて固定する
-    if (currentY >= targetY - 5) {
+    if (b.body.position.y >= targetY - 5) {
       b.landed = true;
       b.fixedX = width / 2;
       b.fixedY = targetY;
@@ -309,10 +350,8 @@ function draw() {
   let maxScroll = Math.max(0, -topY + 40);
   scrollOffset = constrain(scrollOffset, 0, maxScroll);
 
-  const scrollBtn = document.getElementById('scrollToBottomBtn');
-  scrollBtn.classList.toggle('hidden', scrollOffset <= 50);
+  document.getElementById('scrollToBottomBtn').classList.toggle('hidden', scrollOffset <= 50);
 
-  // 振動処理
   shakeAmount *= shakeDecay;
   let sx = shakeAmount > 0.5 ? random(-shakeAmount, shakeAmount) : 0;
   let sy = shakeAmount > 0.5 ? random(-shakeAmount, shakeAmount) : 0;
@@ -333,20 +372,12 @@ function draw() {
     drawCard(b, bx, by, 255);
   });
 
-  // パーティクル描画・更新
   noStroke();
   for (let i = particles.length - 1; i >= 0; i--) {
     let p = particles[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.15; // 重力
-    p.opacity -= 8;
-    p.size *= 0.95;
-    if (p.opacity <= 0) {
-      particles.splice(i, 1);
-      continue;
-    }
-    // カードの色を薄くしたもので土煙を表現
+    p.x += p.vx; p.y += p.vy; p.vy += 0.15;
+    p.opacity -= 8; p.size *= 0.95;
+    if (p.opacity <= 0) { particles.splice(i, 1); continue; }
     fill(p.col[0], p.col[1], p.col[2], p.opacity * 0.5);
     ellipse(p.x, p.y, p.size);
   }
@@ -364,12 +395,10 @@ function drawCard(b, bx, by, opacity) {
   translate(bx, by);
   rect(0, 0, width - 26, b.boxHeight, 12);
 
-  // 補色を計算
   let compR = 255 - col[0];
   let compG = 255 - col[1];
   let compB = 255 - col[2];
 
-  // マーク済み：左端に補色ライン
   if (b.marked) {
     let lineX = -(width - 26) / 2;
     fill(compR, compG, compB, opacity);
@@ -383,37 +412,22 @@ function drawCard(b, bx, by, opacity) {
   let iconY = 0;
   let iconR = 11;
   if (b.marked) {
-    // マーク済みは白丸塗りつぶし
-    fill(255, 255, 255, opacity);
-    noStroke();
+    fill(255, 255, 255, opacity); noStroke();
     ellipse(iconX, iconY, iconR * 2);
     fill(col[0], col[1], col[2], opacity);
-    textAlign(CENTER, CENTER);
-    textSize(12);
-    textStyle(BOLD);
-    text('!', iconX, iconY - 1);
-    textStyle(NORMAL);
+    textAlign(CENTER, CENTER); textSize(12); textStyle(BOLD);
+    text('!', iconX, iconY - 1); textStyle(NORMAL);
   } else {
-    // 未マークは枠線のみ
-    noFill();
-    stroke(255, 255, 255, opacity);
-    strokeWeight(1.5);
+    noFill(); stroke(255, 255, 255, opacity); strokeWeight(1.5);
     ellipse(iconX, iconY, iconR * 2);
-    fill(255, 255, 255, opacity);
-    noStroke();
-    textAlign(CENTER, CENTER);
-    textSize(12);
-    textStyle(BOLD);
-    text('!', iconX, iconY - 1);
-    textStyle(NORMAL);
+    fill(255, 255, 255, opacity); noStroke();
+    textAlign(CENTER, CENTER); textSize(12); textStyle(BOLD);
+    text('!', iconX, iconY - 1); textStyle(NORMAL);
   }
 
-  fill(255, 255, 255, opacity);
-  noStroke();
-  textAlign(LEFT, CENTER);
-  textSize(15);
+  fill(255, 255, 255, opacity); noStroke();
+  textAlign(LEFT, CENTER); textSize(15);
   text(b.taskLabel, -(width / 2 - 26) + 44, 0);
-
   pop();
 }
 
